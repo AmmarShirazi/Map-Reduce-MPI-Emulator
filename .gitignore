@@ -1,0 +1,4 @@
+.vscode/
+a.out
+map-reduce-emu
+*.o
