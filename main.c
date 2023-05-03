@@ -37,8 +37,9 @@ int main(int argc, char **argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Datatype matrix_format_type = create_matrix_format_mpi_datatype();
 
-    int* send_counts = (int*) malloc((world_size - 1) * sizeof(int));;
-    int* dspls = (int*) malloc((world_size - 1) * sizeof(int));;
+    int* send_counts = (int*) malloc((world_size - 1) * sizeof(int));
+    int* dspls = (int*) malloc((world_size - 1) * sizeof(int));
+    int input_arr_size = 0;
     matrix_format* input_arr = NULL;
 
     const char* filename = "input.txt"; // extract from the commandline params
@@ -53,7 +54,7 @@ int main(int argc, char **argv) {
             printf("matrix: %d, i: %d, j: %d, val: %d\n", m.keys[0], m.keys[1], m.keys[2], m.keys[3]);
         }
         input_arr = convert_to_arr(mapper_inputs);
-
+        input_arr_size = mapper_inputs->list_size;
         generate_mapper_inputs(send_counts, dspls, input_arr, mapper_inputs, world_size - 1, world_rank);
 
 
@@ -62,11 +63,21 @@ int main(int argc, char **argv) {
 
     MPI_Bcast(send_counts, world_size - 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(dspls, world_size - 1, MPI_INT, 0, MPI_COMM_WORLD);
-
+    // MPI_Bcast(&input_arr_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    
+    int recv_count = 0;
+    matrix_format* recv_buf = NULL;
     if (world_rank != 0) {
-        int recv_count = send_counts[world_rank - 1];
-        printf("Rank: %d, recvcount: %d\n", world_rank, recv_count);
+        recv_count = send_counts[world_rank - 1];
+        recv_buf = (matrix_format*) malloc(recv_count * sizeof(matrix_format));
+        // input_arr = (matrix_format*) malloc(input_arr_size * sizeof(matrix_format));
     }
+
+    MPI_Scatterv(input_arr, send_counts, dspls, matrix_format_type, recv_buf, recv_count, matrix_format_type, 0, MPI_COMM_WORLD);
+
+
+
+
 
 
 
