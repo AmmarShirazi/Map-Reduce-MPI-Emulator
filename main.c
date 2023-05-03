@@ -4,6 +4,19 @@
 #include "nodemanager.h"
 
 
+typedef struct {
+
+    int** matrix_a;
+    int** matrix_b;
+
+} Matrices;
+
+Matrices parse_string_matrix(char** lines) {
+
+    // return matrix A and B in the given struct return type
+
+
+}
 
 int main(int argc, char **argv) {
     // Initialize MPI
@@ -16,7 +29,7 @@ int main(int argc, char **argv) {
 
     if (world_rank == 0) { // Nodemanager
 
-        split_input(filename, world_size - 1);
+        char** lines = split_input(filename, world_size - 1);
         
         receive_mapper_output();
 
