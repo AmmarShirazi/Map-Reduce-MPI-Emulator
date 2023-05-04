@@ -12,25 +12,24 @@
 #define SHUFFLE_TAG 2
 #define REDUCER_INPUT_TAG 3
 
-void generate_mapper_inputs(int* sendcounts, int* dspls, matrix_format* input_arr, matrix_input_list* mapper_inputs, int num_mappers, int curr_rank) {
-
-
-    int block_size = mapper_inputs->list_size / num_mappers;
-    int remaining = mapper_inputs->list_size - (block_size * num_mappers);
-
+void generate_scatter_data(int* send_counts, int* dspls, int list_size, int num_mappers, int curr_rank) {
     
     
+
+    int block_size = list_size / num_mappers;
+    int remaining = list_size - (block_size * num_mappers);
+
 
 
     int accumulated_displacement = 0;
     for (int i = 0; i < num_mappers; i++) {
-        sendcounts[i] = block_size;
+        send_counts[i] = block_size;
         if (remaining > 0) {
-            sendcounts[i]++;
+            send_counts[i]++;
             remaining--;
         }
         dspls[i] = accumulated_displacement;
-        accumulated_displacement += sendcounts[i];
+        accumulated_displacement += send_counts[i];
     }
 
 

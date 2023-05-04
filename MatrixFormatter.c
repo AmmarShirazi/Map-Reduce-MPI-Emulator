@@ -38,12 +38,16 @@ void insert_line(matrix_input_list* list, matrix_format m) {
 
 }
 
-matrix_format* convert_to_arr(matrix_input_list* list) {
+int** convert_to_arr(matrix_input_list* list) {
 
     node* curr_node = list->head;
-    matrix_format* m_arr = (matrix_format*) malloc(list->list_size * sizeof(matrix_format));
+    int** m_arr = (int**) malloc(list->list_size * sizeof(int*));
     for (int i = 0; i < list->list_size; i++) {
-        m_arr[i] = curr_node->m;
+        m_arr[i] = (int*) malloc(curr_node->m.num_keys * sizeof(int));
+
+        for (int j = 0; j < curr_node->m.num_keys; j++){
+            m_arr[i][j] = curr_node->m.keys[j];
+        }
         curr_node = curr_node->next;
     }
     
