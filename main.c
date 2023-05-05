@@ -1,7 +1,7 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "nodemanager.h"
+#include "node_manager.h"
 
 
 
@@ -13,12 +13,8 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    int* send_counts = (int*) malloc((world_size - 1) * sizeof(int));
-    int* dspls = (int*) malloc((world_size - 1) * sizeof(int));
-    int input_arr_size = 0;
-    int** input_arr = NULL;
-    int rows = 0;
-
+        
+    int rows_a = 0, cols_a = 0, rows_b = 0, cols_b = 0;
     MPI_Datatype int_array_type;
     MPI_Type_contiguous(4, MPI_INT, &int_array_type);
     MPI_Type_commit(&int_array_type);
@@ -28,60 +24,58 @@ int main(int argc, char **argv) {
     if (world_rank == 0) { // Nodemanager
         int lines_count = 0;
         char** lines = read_input(filename, &lines_count);
-        matrix_input_list* mapper_inputs = parse_string_matrix(lines, lines_count);
-        rows = (lines_count - 1) / 2;
+
+        matrix_input_list* mapper_inputs = parse_string_matrix(lines, lines_count, &rows_a, &cols_a, &rows_b, &cols_b);
         
-        input_arr = convert_to_arr(mapper_inputs);
-        input_arr_size = mapper_inputs->list_size;
+        printf("rows_a = %d, cols_a = %d, rows_b = %d, cols_b = %d\n", rows_a, cols_a, rows_b, cols_b);
+        int** input_arr = convert_to_arr(mapper_inputs);
+        int* send_counts = (int*) malloc((world_size - 1) * sizeof(int));
+        int* dspls = (int*) malloc((world_size - 1) * sizeof(int));
         generate_scatter_data(send_counts, dspls, mapper_inputs->list_size, world_size - 1, world_rank);
         for (int i = 0; i < mapper_inputs->list_size; i++) {
  
             printf("matrix: %d, i: %d, j: %d, val: %d\n", input_arr[i][0], input_arr[i][1], input_arr[i][2], input_arr[i][3]);
         }
 
-    }
+        for (int i = 0; i < world_size - 1; i++) {
+            MPI_Send(&send_counts[i], 1, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
 
-    
+            for (int j = dspls[i]; j < dspls[i] + send_counts[i]; j++) {
+                MPI_Send(input_arr[j], 4, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    
-
-    MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(send_counts, world_size - 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(dspls, world_size - 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&input_arr_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-
-    if (world_rank != 0) {
-        input_arr = (int**) malloc(input_arr_size * sizeof(int*));
-
-        for (int i = 0; i < input_arr_size; i++){
-            input_arr[i] = (int*)malloc(4 * sizeof(int));
+            }
         }
+        printf("\n");
+
     }
 
-    for (int i = 0; i < input_arr_size; i++) {
-        MPI_Bcast(input_arr[i], 4, MPI_INT, 0, MPI_COMM_WORLD);
-    }
-    
-    int recv_count = 0;
-    int displacement = 0;
-    if (world_rank != 0) {
-        recv_count = send_counts[world_rank - 1];
-        displacement = dspls[world_rank - 1];
 
 
-        for (int i = displacement; i < displacement + recv_count; i++) {
+    MPI_Bcast(&rows_a, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&cols_b, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if (world_rank != 0) { // Mapper Processes
+        int recv_count = 0;
+
+        MPI_Recv(&recv_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
+        
+        int** recv_buf = (int**) malloc(recv_count * sizeof(int*));
+        for (int i = 0; i < recv_count; i++){
+            recv_buf[i] = (int*) malloc(4 * sizeof(int));
+            MPI_Recv(recv_buf[i], 4, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
+        }
+
+        for (int i = 0; i < recv_count; i++) {
             
-            int matrix_id = input_arr[i][0];
-            int r = input_arr[i][1];
-            int c = input_arr[i][2];
-            int val = input_arr[i][3];
+            int matrix_id = recv_buf[i][0];
+            int r = recv_buf[i][1];
+            int c = recv_buf[i][2];
+            int val = recv_buf[i][3];
             
             if (matrix_id == 0) {
-                int** outputs = (int**) malloc(rows * sizeof(int*));
+                int** outputs = (int**) malloc(cols_b * sizeof(int*));
 
-                for (int j = 0; j < rows; j++){
+                for (int j = 0; j < cols_b; j++){
                     outputs[j] = (int*) malloc(5 * sizeof(int));
                     outputs[j][0] = r;
                     outputs[j][1] = j;
@@ -92,9 +86,9 @@ int main(int argc, char **argv) {
                 }
             }
             else {
-                int** outputs = (int**) malloc(rows * sizeof(int*));
+                int** outputs = (int**) malloc(rows_a * sizeof(int*));
 
-                for (int j = 0; j < rows; j++){
+                for (int j = 0; j < rows_a; j++){
                     outputs[j] = (int*) malloc(5 * sizeof(int));
                     outputs[j][0] = j;
                     outputs[j][1] = c;
@@ -108,10 +102,9 @@ int main(int argc, char **argv) {
     }
 
 
-    if (world_rank == 0) {
+    if (world_rank == 0) {  // Reducer Processors
         matrix_input_list* pairs =  init_matrix_input_list();
-
-        for (int i = 0; i < input_arr_size * rows; i++) {
+        for (int i = 0; i < (rows_a * cols_a * cols_b) + (rows_b * cols_b * rows_a); i++) {
 
             matrix_format p;
             p.num_keys = 5;

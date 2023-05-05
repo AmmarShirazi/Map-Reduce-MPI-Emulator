@@ -1,4 +1,4 @@
-#include "MatrixFormatter.h"
+#include "matrix_formatter.h"
 
 #include <stdlib.h>
 

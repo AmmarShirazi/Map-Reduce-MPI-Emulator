@@ -1,5 +1,5 @@
-#include "nodemanager.h"
-#include "MatrixFormatter.h"
+#include "node_manager.h"
+#include "matrix_formatter.h"
 #include <stdio.h>
 #include <mpi.h>
 #include <string.h>
@@ -36,7 +36,7 @@ void generate_scatter_data(int* send_counts, int* dspls, int list_size, int num_
 
 }
 
-matrix_input_list* parse_string_matrix(char** lines, int lines_count) {
+matrix_input_list* parse_string_matrix(char** lines, int lines_count, int* rows_a, int* cols_a, int* rows_b, int* cols_b) {
     
     matrix_input_list* list =  init_matrix_input_list();
 
@@ -47,6 +47,7 @@ matrix_input_list* parse_string_matrix(char** lines, int lines_count) {
 
 
         if (lines[i][0] == '*') {
+            *rows_a = i;
             is_processing_matrix_a = false;
             matrix_b_start = -1;
             continue;
@@ -77,8 +78,17 @@ matrix_input_list* parse_string_matrix(char** lines, int lines_count) {
             token = strtok(NULL, ",");
 
         }
+        if (is_processing_matrix_a == true && lines[i + 1][0] == '*') {
+            *cols_a = curr_j;
+        }
+        if (i == lines_count - 1 && is_processing_matrix_a == false){
+            *cols_b = curr_j;
+        }
 
     }
+
+    *rows_b = lines_count - *rows_a;
+    *rows_b = *rows_b - 1;
 
 
     return list;
