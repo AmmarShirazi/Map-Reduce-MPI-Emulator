@@ -1,7 +1,7 @@
 #include "matrix_formatter.h"
 
 #include <stdlib.h>
-
+#include <stdio.h>
 
 matrix_input_list* init_matrix_input_list() {
 
@@ -10,6 +10,57 @@ matrix_input_list* init_matrix_input_list() {
     list->list_size = 0;
 
     return list;
+
+}
+
+
+bool is_val_exists(matrix_input_list* list, matrix_format m) {
+
+    
+
+    node* curr_node = list->head;
+    for (int i = 0; i < list->list_size; i++) {
+        bool not_eq_flag = false;
+        for (int j = 0; j < m.num_keys; j++){
+            if (m.keys[j] != curr_node->m.keys[j]) {
+                not_eq_flag = true;
+            }
+        }
+        if (not_eq_flag == false) {
+            return true;
+        }
+
+        curr_node = curr_node->next;
+    }
+
+    return false;
+}
+
+void unique_insert(matrix_input_list* list, matrix_format m) {
+
+    if (list->head == NULL) {
+        list->head = (node*) malloc(sizeof(node));
+        list->head->m = m;
+        list->head->next = NULL;
+        list->list_size++;
+        return;
+    }
+
+    if (is_val_exists(list, m) == true) {
+        return;
+    }
+
+    node* curr_node = list->head;
+
+    while(curr_node->next != NULL) {
+        curr_node = curr_node->next;
+    }
+
+    
+    curr_node->next = (node*) malloc(sizeof(node));
+    curr_node->next->m = m;
+    curr_node->next->next = NULL;
+    list->list_size++;
 
 }
 
@@ -75,6 +126,8 @@ void destory_matrix_input_list(matrix_input_list* list) {
     node* trail = curr_node;
     curr_node = curr_node->next;
     while (curr_node != NULL) {
+        
+        free(trail->m.keys);
 
         free(trail);
         trail = curr_node;

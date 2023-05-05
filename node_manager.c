@@ -7,15 +7,15 @@
 #include <stdlib.h>
 
 
-#define JOB_TAG 0
-#define MAPPER_COMPLETE_TAG 1
-#define SHUFFLE_TAG 2
-#define REDUCER_INPUT_TAG 3
 
-void generate_scatter_data(int* send_counts, int* dspls, int list_size, int num_mappers, int curr_rank) {
+
+
+void generate_scatter_data(int* send_counts, int* dspls, int list_size, int num_mappers) {
     
     
-
+    if (list_size < num_mappers) {
+        num_mappers = list_size;
+    }
     int block_size = list_size / num_mappers;
     int remaining = list_size - (block_size * num_mappers);
 
@@ -33,6 +33,20 @@ void generate_scatter_data(int* send_counts, int* dspls, int list_size, int num_
     }
 
 
+
+}
+
+void get_keys_list(matrix_input_list* keys, int** pairs_arr, int total_pairs) {
+
+    for (int i = 0; i < total_pairs; i++){
+        matrix_format md;
+        md.num_keys = 2;
+        md.keys = (int*) malloc(md.num_keys * sizeof(int));
+        md.keys[0] = pairs_arr[i][0];
+        md.keys[1] = pairs_arr[i][1];
+
+        unique_insert(keys, md);
+    }
 
 }
 
@@ -122,16 +136,4 @@ char** read_input(const char *input_file, int* lines_count) {
     fclose(fileptr);
 
     return lines;
-}
-
-void receive_mapper_output() {
-    // Implement receiving output from mappers
-}
-
-void shuffle_and_send_to_reducers() {
-    // Implement shuffling of mapper output and sending to reducers
-}
-
-void process_reducer_output() {
-    // Implement processing of reducer output
 }
