@@ -13,36 +13,34 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-        
+  
     int rows_a = 0, cols_a = 0, rows_b = 0, cols_b = 0;
 
     const char* filename = "input.txt"; // extract from the commandline params
 
     if (world_rank == 0) { // Nodemanager
+        printf("Master with process_id %d, running on %s\n", world_rank, "lol");
         int lines_count = 0;
+        
         char** lines = read_input(filename, &lines_count);
-
         matrix_input_list* mapper_inputs = parse_string_matrix(lines, lines_count, &rows_a, &cols_a, &rows_b, &cols_b);
         
-        printf("rows_a = %d, cols_a = %d, rows_b = %d, cols_b = %d\n", rows_a, cols_a, rows_b, cols_b);
+        printf("rows_a = %d, cols_a = %d, rows_b = %d, cols_b = %d\n\n", rows_a, cols_a, rows_b, cols_b);
         int** input_arr = convert_to_arr(mapper_inputs);
         int* send_counts = (int*) calloc((world_size - 1), sizeof(int));
         int* dspls = (int*) calloc((world_size - 1), sizeof(int));
         generate_scatter_data(send_counts, dspls, mapper_inputs->list_size, world_size - 1);
-        for (int i = 0; i < mapper_inputs->list_size; i++) {
- 
-            printf("matrix: %d, i: %d, j: %d, val: %d\n", input_arr[i][0], input_arr[i][1], input_arr[i][2], input_arr[i][3]);
-        }
+        
 
         for (int i = 0; i < world_size - 1; i++) {
             MPI_Send(&send_counts[i], 1, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
 
             for (int j = dspls[i]; j < dspls[i] + send_counts[i]; j++) {
+                printf("Task Map assigned to process %d\n", i + 1);
                 MPI_Send(input_arr[j], 4, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
 
             }
         }
-        printf("\n");
 
 
         // free up all the memory
@@ -61,6 +59,8 @@ int main(int argc, char **argv) {
 
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
     MPI_Bcast(&rows_a, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&cols_b, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -72,6 +72,7 @@ int main(int argc, char **argv) {
         int** recv_buf = (int**) malloc(recv_count * sizeof(int*));
         for (int i = 0; i < recv_count; i++){
             recv_buf[i] = (int*) malloc(4 * sizeof(int));
+            printf("Process %d, received task Map on %s.\n", world_rank, "lol");
             MPI_Recv(recv_buf[i], 4, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
         }
 
@@ -129,9 +130,11 @@ int main(int argc, char **argv) {
             matrix_format p;
             p.num_keys = 5;
             p.keys = (int*) malloc(p.num_keys * sizeof(int));
-            
-            MPI_Recv(p.keys, p.num_keys, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, NULL);
-            printf("(%d, %d): %d, %d, %d\n", p.keys[0], p.keys[1], p.keys[2], p.keys[3], p.keys[4]);
+            MPI_Status status;
+
+            MPI_Recv(p.keys, p.num_keys, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+            printf("Process %d has completed task Map\n", status.MPI_SOURCE);
+
             insert_line(pairs, p);
         }
 
@@ -144,11 +147,6 @@ int main(int argc, char **argv) {
 
         get_keys_list(keys, pairs_arr, total_pairs);
         int** keys_arr = convert_to_arr(keys);
-
-        for (int i = 0; i < keys->list_size; i++) {
-            printf("%d, %d\n", get_at_index(keys, i).keys[0], get_at_index(keys, i).keys[1]);
-        }
-
 
 
 
@@ -169,6 +167,7 @@ int main(int argc, char **argv) {
                 }
 
                 MPI_Send(&count, 1, MPI_INT, i + 1, 1, MPI_COMM_WORLD);
+                printf("Task Reduce assigned to process %d\n", i + 1);
 
                 for (int k = 0; k < total_pairs; k++) {
                     if (pairs_arr[k][0] == keys_arr[j][0] && pairs_arr[k][1] == keys_arr[j][1]) {
@@ -206,13 +205,13 @@ int main(int argc, char **argv) {
         int* value_count = (int *) malloc(recv_count * sizeof(int*));
         for (int i = 0; i < recv_count; i++){
             MPI_Recv(&value_count[i], 1, MPI_INT, 0, 1, MPI_COMM_WORLD, NULL);
-            
+            printf("Process %d, received task Reduce on %s.\n", world_rank, "lol");
+
             recv_buf[i] = (int**) malloc(value_count[i] * sizeof(int*));
 
             for (int j = 0; j < value_count[i]; j++) {
                 recv_buf[i][j] = (int*) malloc(5 * sizeof(int));
                 MPI_Recv(recv_buf[i][j], 5, MPI_INT, 0, 2, MPI_COMM_WORLD, NULL);
-                printf("%d, ->, %d, %d\n", world_rank, recv_buf[i][j][0], recv_buf[i][j][1]);
             }
         }
         
@@ -222,9 +221,6 @@ int main(int argc, char **argv) {
             for (int j = 0; j < value_count[i]; j++){
                 
                 if (recv_buf[i][j][2] == 0) {
-                    int row = recv_buf[i][j][0];
-                    int col = recv_buf[i][j][1];
-                    int matrix_id = recv_buf[i][j][2];
                     int common_index = recv_buf[i][j][3];
                     int val = recv_buf[i][j][4];
 
@@ -246,17 +242,42 @@ int main(int argc, char **argv) {
             MPI_Send(send_res_buf, 3, MPI_INT, 0, 0, MPI_COMM_WORLD);
         }
 
+
+        for (int i = 0; i < recv_count; i++){
+
+            for (int j = 0; j < value_count[i]; j++){
+                free(recv_buf[i][j]);
+            }
+            free(recv_buf[i]);
+        }
+        free(recv_buf);
+
     }
 
     
     if (world_rank == 0) {
+        int result_r = rows_a;
+        int result_c = cols_b;
+        
+        int** result_matrix = (int**) malloc(result_r * sizeof(int*));
 
-        for (int i = 0; i < num_keys; i++){
+        for (int i = 0; i < result_r; i++) {
+            result_matrix[i] = (int*) malloc(result_c * sizeof(int));
+        }
+
+        for (int i = 0; i < num_keys; i++) {
             
             int* recv_buf = (int*) malloc(3 * sizeof(int));
-            MPI_Recv(recv_buf, 3, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, NULL);
-            printf("(%d, %d): %d\n", recv_buf[0], recv_buf[1], recv_buf[2]);
+            MPI_Status status;
+            MPI_Recv(recv_buf, 3, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+            printf("Process %d has completed task Reduce\n", status.MPI_SOURCE);
+
+            result_matrix[recv_buf[0]][recv_buf[1]] = recv_buf[2];
+            
+            free(recv_buf);
         }
+
+        write_matrix_to_file("res.txt", result_matrix, result_r, result_c);
 
     }
 

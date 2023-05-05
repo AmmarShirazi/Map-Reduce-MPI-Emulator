@@ -7,7 +7,27 @@
 #include <stdlib.h>
 
 
+void write_matrix_to_file(const char *filename, int **matrix, int rows, int cols) {
+    FILE *file = fopen(filename, "w");
 
+    if (file == NULL) {
+        printf("Error opening file: %s\n", filename);
+        return;
+    }
+
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            fprintf(file, "%d", matrix[i][j]);
+
+            if (j < cols - 1) {
+                fprintf(file, ", ");
+            }
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+}
 
 
 void generate_scatter_data(int* send_counts, int* dspls, int list_size, int num_mappers) {
@@ -117,7 +137,7 @@ char** read_input(const char *input_file, int* lines_count) {
         printf("Error Opening File: %s\n", input_file);
         exit(1);
     }
-    char buffer[1024];
+    char buffer[10240];
     char* lines_buffer[1024];
 
     while (fscanf(fileptr, "%s\n", buffer) != EOF) {

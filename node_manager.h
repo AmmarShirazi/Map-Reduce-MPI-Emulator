@@ -7,7 +7,7 @@ matrix_input_list* parse_string_matrix(char** lines, int lines_count, int* rows_
 void generate_scatter_data(int* send_counts, int* dspls, int list_size, int num_mappers);
 void get_keys_list(matrix_input_list* keys, int** pairs_arr, int total_pairs);
 char** read_input(const char *input_file, int* lines_count);
-
+void write_matrix_to_file(const char *filename, int **matrix, int rows, int cols);
 
 
 #endif
