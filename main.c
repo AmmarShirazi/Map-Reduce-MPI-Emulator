@@ -26,9 +26,11 @@ int main(int argc, char **argv) {
     const char* filename = argv[1];
     const char* output_file = argv[2];
 
-
+    char pname[MPI_MAX_PROCESSOR_NAME];
+    int len;
     if (world_rank == 0) { // Nodemanager
-        printf("Master with process_id %d, running on %s\n", world_rank, "lol");
+        MPI_Get_processor_name(pname, &len);
+        printf("Master with process_id %d, running on %s\n", world_rank, pname);
         int lines_count = 0;
         
         char** lines = read_input(filename, &lines_count);
@@ -39,13 +41,12 @@ int main(int argc, char **argv) {
         int* send_counts = (int*) calloc((world_size - 1), sizeof(int));
         int* dspls = (int*) calloc((world_size - 1), sizeof(int));
         generate_scatter_data(send_counts, dspls, mapper_inputs->list_size, world_size - 1);
-        
 
         for (int i = 0; i < world_size - 1; i++) {
             MPI_Send(&send_counts[i], 1, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
+            printf("Task Map assigned to process %d\n", i + 1);
 
             for (int j = dspls[i]; j < dspls[i] + send_counts[i]; j++) {
-                printf("Task Map assigned to process %d\n", i + 1);
                 MPI_Send(input_arr[j], 4, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
 
             }
@@ -76,13 +77,18 @@ int main(int argc, char **argv) {
     if (world_rank != 0) { // Mapper Processes
         int recv_count = 0;
 
-        MPI_Recv(&recv_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
+        MPI_Recv(&recv_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         
+        if (recv_count != 0) {
+            MPI_Get_processor_name(pname, &len);
+            printf("Process %d, received task Map on %s.\n", world_rank, pname);
+        }
+
+
         int** recv_buf = (int**) malloc(recv_count * sizeof(int*));
         for (int i = 0; i < recv_count; i++){
             recv_buf[i] = (int*) malloc(4 * sizeof(int));
-            printf("Process %d, received task Map on %s.\n", world_rank, "lol");
-            MPI_Recv(recv_buf[i], 4, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
+            MPI_Recv(recv_buf[i], 4, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
 
         for (int i = 0; i < recv_count; i++) {
@@ -128,6 +134,11 @@ int main(int argc, char **argv) {
             free(recv_buf[i]);
         }
         free(recv_buf);
+
+        if (recv_count != 0) {
+            printf("Process %d has completed task Map\n", world_rank);
+        }
+
     }
 
     int num_keys = 0;
@@ -142,10 +153,10 @@ int main(int argc, char **argv) {
             MPI_Status status;
 
             MPI_Recv(p.keys, p.num_keys, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-            printf("Process %d has completed task Map\n", status.MPI_SOURCE);
 
             insert_line(pairs, p);
         }
+        printf("Total Pairs Generated: %d\n", total_pairs);
 
 
 
@@ -164,7 +175,9 @@ int main(int argc, char **argv) {
         generate_scatter_data(send_counts, dspls, keys->list_size, world_size - 1);
 
         for (int i = 0; i < world_size - 1; i++) {
+
             MPI_Send(&send_counts[i], 1, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
+            printf("Task Reduce assigned to process %d\n", i + 1);
 
             for (int j = dspls[i]; j < dspls[i] + send_counts[i]; j++) {
 
@@ -176,7 +189,6 @@ int main(int argc, char **argv) {
                 }
 
                 MPI_Send(&count, 1, MPI_INT, i + 1, 1, MPI_COMM_WORLD);
-                printf("Task Reduce assigned to process %d\n", i + 1);
 
                 for (int k = 0; k < total_pairs; k++) {
                     if (pairs_arr[k][0] == keys_arr[j][0] && pairs_arr[k][1] == keys_arr[j][1]) {
@@ -207,20 +219,26 @@ int main(int argc, char **argv) {
 
     if (world_rank != 0){
 
+        
         int recv_count = 0;
 
-        MPI_Recv(&recv_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, NULL);
+        MPI_Recv(&recv_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         int*** recv_buf = (int***) malloc(recv_count * sizeof(int*));
         int* value_count = (int *) malloc(recv_count * sizeof(int*));
+
+        if (recv_count != 0) {
+            MPI_Get_processor_name(pname, &len);
+            printf("Process %d, received task Reduce on %s.\n", world_rank, pname);
+        }
+
         for (int i = 0; i < recv_count; i++){
-            MPI_Recv(&value_count[i], 1, MPI_INT, 0, 1, MPI_COMM_WORLD, NULL);
-            printf("Process %d, received task Reduce on %s.\n", world_rank, "lol");
+            MPI_Recv(&value_count[i], 1, MPI_INT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
             recv_buf[i] = (int**) malloc(value_count[i] * sizeof(int*));
 
             for (int j = 0; j < value_count[i]; j++) {
                 recv_buf[i][j] = (int*) malloc(5 * sizeof(int));
-                MPI_Recv(recv_buf[i][j], 5, MPI_INT, 0, 2, MPI_COMM_WORLD, NULL);
+                MPI_Recv(recv_buf[i][j], 5, MPI_INT, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             }
         }
         
@@ -261,6 +279,11 @@ int main(int argc, char **argv) {
         }
         free(recv_buf);
 
+        if (recv_count != 0) {
+            printf("Process %d has completed task Reduce\n", world_rank);
+        }
+
+
     }
 
     
@@ -279,7 +302,6 @@ int main(int argc, char **argv) {
             int* recv_buf = (int*) malloc(3 * sizeof(int));
             MPI_Status status;
             MPI_Recv(recv_buf, 3, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-            printf("Process %d has completed task Reduce\n", status.MPI_SOURCE);
 
             result_matrix[recv_buf[0]][recv_buf[1]] = recv_buf[2];
             
