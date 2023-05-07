@@ -16,7 +16,16 @@ int main(int argc, char **argv) {
   
     int rows_a = 0, cols_a = 0, rows_b = 0, cols_b = 0;
 
-    const char* filename = "input.txt"; // extract from the commandline params
+    if (argc != 3) {
+        fprintf(stderr, "Usage: mpirun -np <num_processes> %s <input_file> <output_file>\n", argv[0]);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+        return 0;
+    }
+
+    // Extract the filename from the commandline params
+    const char* filename = argv[1];
+    const char* output_file = argv[2];
+
 
     if (world_rank == 0) { // Nodemanager
         printf("Master with process_id %d, running on %s\n", world_rank, "lol");
@@ -277,7 +286,7 @@ int main(int argc, char **argv) {
             free(recv_buf);
         }
 
-        write_matrix_to_file("res.txt", result_matrix, result_r, result_c);
+        write_matrix_to_file(output_file, result_matrix, result_r, result_c);
 
     }
 
