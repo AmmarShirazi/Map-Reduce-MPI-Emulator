@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
         char** lines = read_input(filename, &lines_count);
         matrix_input_list* mapper_inputs = parse_string_matrix(lines, lines_count, &rows_a, &cols_a, &rows_b, &cols_b);
         
-        printf("rows_a = %d, cols_a = %d, rows_b = %d, cols_b = %d\n\n", rows_a, cols_a, rows_b, cols_b);
+        printf("Matrices Read: rows_a = %d, cols_a = %d, rows_b = %d, cols_b = %d\n", rows_a, cols_a, rows_b, cols_b);
         int** input_arr = convert_to_arr(mapper_inputs);
         int* send_counts = (int*) calloc((world_size - 1), sizeof(int));
         int* dspls = (int*) calloc((world_size - 1), sizeof(int));
@@ -309,6 +309,7 @@ int main(int argc, char **argv) {
         }
 
         write_matrix_to_file(output_file, result_matrix, result_r, result_c);
+        printf("Job completed and output written to file: %s\n", output_file);
 
     }
 
